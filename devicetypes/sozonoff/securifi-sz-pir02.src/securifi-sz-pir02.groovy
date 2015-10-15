@@ -7,6 +7,7 @@ metadata {
         attribute "tamperSwitch","ENUM",["open","closed"]
                 
         command "enrollResponse"
+        command "configure"
         
 		fingerprint endpointId: '08', profileId: '0104', inClusters: "0000,0003,0500", outClusters: "0003"
 	}
@@ -33,10 +34,15 @@ metadata {
         standardTile("tamperSwitch", "device.tamperSwitch", width: 1, height: 1) {
 			state("open", label:'${name}', icon:"st.contact.contact.open", backgroundColor:"#ffa81e")
 			state("closed", label:'${name}', icon:"st.contact.contact.closed", backgroundColor:"#79b821")
-		}        
+		}
+        
+        standardTile("configure", "device.configure", width: 1, height: 1) {
+			state "configure", label:'', action:"configure", icon:"st.secondary.configure"
+		}
 		
 		main (["motion"])
-		details(["motion","tamperSwitch"])
+		//details(["motion","tamperSwitch"])
+		details(["motion","tamperSwitch","configure"])
 	}
 }
 
@@ -45,17 +51,23 @@ def configure() {
     
 	String zigbeeId = swapEndianHex(device.hub.zigbeeId)
 	log.debug "Configuring Reporting, IAS CIE, and Bindings."
+
+        // Commenting out the send-me-a-report since I am getting alerts every hour during the day?
+        //"zcl global send-me-a-report 1 0x20 0x20 0x3600 0x3600 {01}", "delay 200",
+		// Different defice "zcl global send-me-a-report 6 0 0x10 0 120 {}", "delay 500",
 	def configCmds = [
     	"zcl global write 0x500 0x10 0xf0 {${zigbeeId}}", "delay 200",
 		"send 0x${device.deviceNetworkId} 1 1", "delay 1500",
         
-        "zcl global send-me-a-report 1 0x20 0x20 0x3600 0x3600 {01}", "delay 200",
+        "zcl global send-me-a-report 1 0x20 0x20 0x4650 0x4650 {01}", "delay 200",
         "send 0x${device.deviceNetworkId} 1 1", "delay 1500",
         
 		"zdo bind 0x${device.deviceNetworkId} 1 1 0x001 {${device.zigbeeId}} {}", "delay 1500",
         
         "raw 0x500 {01 23 00 00 00}", "delay 200",
         "send 0x${device.deviceNetworkId} 1 1", "delay 1500",
+        
+
 	]
     return configCmds // send refresh cmds as part of config
 }
@@ -97,9 +109,10 @@ def parse(String description) {
 }
 
 private Map parseIasMessage(String description) {
+	
     List parsedMsg = description.split(' ')
     String msgCode = parsedMsg[2]
-    
+    log.debug("** PIR02 parse message received ** ${description}")
     Map resultMap = [:]
     switch(msgCode) {
 		case '0x0030': // Closed/No Motion/Dry

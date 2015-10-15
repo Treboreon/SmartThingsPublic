@@ -3,7 +3,9 @@ metadata {
 		capability "Water Sensor"
 		capability "Sensor"
         capability "Configuration"
-        //capability "Battery"
+        capability "Battery"
+        capability "Refresh"
+
         
         attribute "tamperSwitch","ENUM",["open","closed"]
                 
@@ -40,13 +42,15 @@ metadata {
         standardTile("configure", "device.configure", width: 1, height: 1) {
 			state "configure", label:'', action:"getClusters", icon:"st.secondary.configure"
 		}
-        /*
         valueTile("battery", "device.battery", decoration: "flat", inactiveLabel: false, width: 2, height: 2) {
 			state "battery", label:'${currentValue}% battery', unit:""
-		}*/
+		}
+		standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
+			state "default", action:"refresh.refresh", icon:"st.secondary.refresh"
+		}
 		main (["water"])
-		//details(["water","tamperSwitch","configure", "battery"])
-        details(["water","tamperSwitch"])
+		details(["water","tamperSwitch","configure", "battery", "refresh"])
+        //details(["water","tamperSwitch"])
 	}
 }
 
@@ -85,6 +89,16 @@ def enrollResponse() {
     ]
 }
 
+def refresh() {
+	log.debug "Refreshing Temperature and Battery"
+	def refreshCmds = [
+        "st rattr 0x${device.deviceNetworkId} 1 0x402 0", "delay 200",
+		"st rattr 0x${device.deviceNetworkId} 1 1 0x20", "delay 200"
+	]
+
+	return refreshCmds + enrollResponse()
+}
+
 // Parse incoming device messages to generate events
 def parse(String description) {
 	log.debug("** AL-WTD01 parse received ** ${description}")
@@ -94,9 +108,9 @@ def parse(String description) {
     if (description?.startsWith('zone status')) {
 	    map = parseIasMessage(description)
     }
-// 	elseif (description?.startsWith('catchall:')) {
-//		map = parseCatchAllMessage(description)
-//	}
+ 	elseif (description?.startsWith('catchall:')) {
+		map = parseCatchAllMessage(description)
+	}
     
 	log.debug "Parse returned $map"
     map.each { k, v ->
@@ -115,7 +129,6 @@ def parse(String description) {
 }
 
 // TESTING
-/*
 private Map parseCatchAllMessage(String description) {
 	log.debug("** AL-WTD01 parse received ** CatchAllParse ")
     Map resultMap = [:]
@@ -123,7 +136,7 @@ private Map parseCatchAllMessage(String description) {
     if (shouldProcessMessage(cluster)) {
         switch(cluster.clusterId) {
             case 0x0001:
-            	log.debug("Should get batter Result");
+            	log.debug("Should get battery Result");
             	// resultMap = getBatteryResult(cluster.data.last())
                 break
 
@@ -142,7 +155,7 @@ private boolean shouldProcessMessage(cluster) {
         (cluster.data.size() > 0 && cluster.data.first() == 0x3e)
     return !ignoredMessage
 }
-*/ 
+
 
 private Map parseIasMessage(String description) {
     List parsedMsg = description.split(' ')
