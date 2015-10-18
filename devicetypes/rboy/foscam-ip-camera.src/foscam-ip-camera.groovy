@@ -263,11 +263,14 @@ def take() {
 
 //SWITCH ACTIONS
 def on() {
-	log.debug "On requested, enabling monitoring"
+	// sendEvent(name: "switch", value: "on", isStateChange: true)
+    log.debug "On requested, enabling monitoring"
     alarmOn()
+    
 }
 
 def off() {
+    //sendEvent(name: "switch", value: "off", isStateChange: true)    
 	log.debug "Off requested, disabling monitoring"
     alarmOff()
 }
@@ -306,21 +309,21 @@ def alarmOn() {
 	log.debug "Enabling Alarm"
 
 	if(hdcamera) {
-		delayBetween([hubGet("cmd=setMotionDetectConfig&isEnable=1&snapInterval=1&sensitivity=${getMotionLevel(motionLevel)}&linkage=${getMotionAlarmEvents()}&triggerInterval=${getReArmInterval("15s")}&schedule0=281474976710655&schedule1=281474976710655&schedule2=281474976710655&schedule3=281474976710655&schedule4=281474976710655&schedule5=281474976710655&schedule6=281474976710655&area0=1023&area1=1023&area2=1023&area3=1023&area4=1023&area5=1023&area6=1023&area7=1023&area8=1023&area9=1023&1421696056773"), poll()], delayInterval())
+		delayBetween([hubGet(preset1_command()),hubGet("cmd=setMotionDetectConfig&isEnable=1&snapInterval=1&sensitivity=${getMotionLevel(motionLevel)}&linkage=${getMotionAlarmEvents()}&triggerInterval=${getReArmInterval("15s")}&schedule0=281474976710655&schedule1=281474976710655&schedule2=281474976710655&schedule3=281474976710655&schedule4=281474976710655&schedule5=281474976710655&schedule6=281474976710655&area0=1023&area1=1023&area2=1023&area3=1023&area4=1023&area5=1023&area6=1023&area7=1023&area8=1023&area9=1023&1421696056773"), poll()], delayInterval())
     }
     else {
-    	delayBetween([hubGet("/set_alarm.cgi?motion_armed=1&motion_sensitivity=${getMotionLevel(motionLevel)}&motion_compensation=${lightCompensation ? "1" : "0"}&mail=${motionEMail ? "1" : "0"}&upload_interval=${motionSnap ? "1" : "0"}&"), poll()], delayInterval())
+    	delayBetween([hubGet(preset1_command()),hubGet("/set_alarm.cgi?motion_armed=1&motion_sensitivity=${getMotionLevel(motionLevel)}&motion_compensation=${lightCompensation ? "1" : "0"}&mail=${motionEMail ? "1" : "0"}&upload_interval=${motionSnap ? "1" : "0"}&"), poll()], delayInterval())
     }
 }
 
 def alarmOff() {
 	log.debug "Disabling Alarm"
-
+	
     if(hdcamera) {
-		delayBetween([hubGet("cmd=setMotionDetectConfig&isEnable=0"), poll()], delayInterval())
+		delayBetween([hubGet(preset3_command()),hubGet("cmd=setMotionDetectConfig&isEnable=0"), poll()], delayInterval())
     }
     else {
-    	delayBetween([hubGet("/set_alarm.cgi?motion_armed=0&"), poll()], delayInterval())
+    	delayBetween([hubGet(preset3_command()),hubGet("/set_alarm.cgi?motion_armed=0&"), poll()], delayInterval())
     }
     
 }
@@ -375,35 +378,50 @@ def ledAuto() {
 }
 //END LED ACTIONS
 
+private preset1_command()
+{
+	if(hdcamera) {
+        return "cmd=ptzGotoPresetPoint&name=${URLEncoder.encode(preset1)}"
+    }
+    else {
+        return "/decoder_control.cgi?command=31&"
+    }
+}
+
+private preset2_command()
+{
+	if(hdcamera) {
+        return "cmd=ptzGotoPresetPoint&name=${URLEncoder.encode(preset2)}"
+    }
+    else {
+        return "/decoder_control.cgi?command=33&"
+    }
+}
+
+private preset3_command()
+{
+	if(hdcamera) {
+        return "cmd=ptzGotoPresetPoint&name=${URLEncoder.encode(preset3)}"
+    }
+    else {
+        return "/decoder_control.cgi?command=35&"
+    }
+}
+
 //PRESET ACTIONS
 def preset1() {
 	log.debug("Preset 1 Selected - ${preset1}")
-	if(hdcamera) {
-		delayBetween([hubGet("cmd=ptzGotoPresetPoint&name=${URLEncoder.encode(preset1)}"), poll()], delayInterval())
-    }
-    else {
-    	delayBetween([hubGet("/decoder_control.cgi?command=31&"), poll()], delayInterval())
-    }
+    delayBetween([hubGet(preset1_command()), poll()], delayInterval())
 }
 
 def preset2() {
 	log.debug("Preset 2 Selected - ${preset2}")
-	if(hdcamera) {
-		delayBetween([hubGet("cmd=ptzGotoPresetPoint&name=${URLEncoder.encode(preset2)}"), poll()], delayInterval())
-    }
-    else {
-    	delayBetween([hubGet("/decoder_control.cgi?command=33&"), poll()], delayInterval())
-    }
+    delayBetween([hubGet(preset2_command()), poll()], delayInterval())
 }
 
 def preset3() {
 	log.debug("Preset 3 Selected - ${preset3}")
-	if(hdcamera) {
-		delayBetween([hubGet("cmd=ptzGotoPresetPoint&name=${URLEncoder.encode(preset3)}"), poll()], delayInterval())
-    }
-    else {
-    	delayBetween([hubGet("/decoder_control.cgi?command=35&"), poll()], delayInterval())
-    }
+    delayBetween([hubGet(preset3_command()), poll()], delayInterval())
 }
 //END PRESET ACTIONS
 
@@ -656,14 +674,17 @@ private hubGet(def apiCommand) {
 	//log.trace("Executing hubaction on " + getHostAddress())
 
     def uri = ""
+    def log_uri = ""
     if (hdcamera) {
     	uri = "/cgi-bin/CGIProxy.fcgi?" + getLogin() + apiCommand
+        log_uri = "/cgi-bin/CGIProxy.fcgi?" + "LOGIN_INFO&" + apiCommand
 	}
     else {
     	uri = apiCommand + getLogin()
+        log_uri = apiCommand + "LOGIN_INFO"
     }
     
-    log.trace "Sending command -> http://${getHostAddress()}$uri"
+    log.trace "Sending command -> http://${getHostAddress()}$log_uri"
 
 	boolean doHubAction = false
     if (isPublicIPAddress(state.ipAddress)) { // If we are working with a public IP address then use httpGet from ST cloud to public IP, it's faster and more reliable (doesn't depend on loopback)
