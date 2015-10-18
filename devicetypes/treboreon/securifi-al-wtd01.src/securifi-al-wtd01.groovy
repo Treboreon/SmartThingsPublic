@@ -108,7 +108,7 @@ def parse(String description) {
     if (description?.startsWith('zone status')) {
 	    map = parseIasMessage(description)
     }
- 	elseif (description?.startsWith('catchall:')) {
+ 	else if (description?.startsWith('catchall:')) {
 		map = parseCatchAllMessage(description)
 	}
     
